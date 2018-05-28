@@ -45,7 +45,7 @@ pub struct Match<'a> {
 
 #[derive(Debug)]
 pub struct PathParams<'p> {
-    pub h: Option<HashMap<&'p str, String>>,
+    pub params: Option<HashMap<&'p str, String>>,
 }
 
 #[derive(Debug)]
@@ -56,10 +56,10 @@ pub struct NodeExtra {
 
 #[derive(Debug)]
 pub struct Node {
-    pub statics: Option<HashMap<String, Node>>,
-    pub param: Option<NodeExtra>,
-    pub wild: Option<NodeExtra>,
-    pub handler: Option<Box<Handler>>,
+    statics: Option<HashMap<String, Node>>,
+    param: Option<NodeExtra>,
+    wild: Option<NodeExtra>,
+    handler: Option<Box<Handler>>,
 }
 
 impl Node {
@@ -153,7 +153,7 @@ impl Node {
                         let handler = &node.handler.as_ref()?;
                         return Some(Match {
                             handler,
-                            params: PathParams { h: None },
+                            params: PathParams { params: None },
                         });
                     }
                     return node.find(parts[1]);
@@ -175,13 +175,13 @@ impl Node {
                 let mut m = Some(Match {
                     handler,
                     params: PathParams {
-                        h: Some(HashMap::new()),
+                        params: Some(HashMap::new()),
                     },
                 });
                 m.as_mut()
                     .unwrap()
                     .params
-                    .h
+                    .params
                     .as_mut()
                     .unwrap()
                     .insert(enode.id.as_ref(), parts[0].to_owned());
@@ -191,10 +191,10 @@ impl Node {
             let mut results = node.find(parts[1]);
             if results.is_some() {
                 let results = results.as_mut().unwrap();
-                if results.params.h.is_none() {
-                    results.params.h = Some(HashMap::new());
+                if results.params.params.is_none() {
+                    results.params.params = Some(HashMap::new());
                 }
-                let p = results.params.h.as_mut().unwrap();
+                let p = results.params.params.as_mut().unwrap();
                 p.insert(enode.id.as_ref(), parts[0].to_owned());
             }
             return results;
@@ -208,13 +208,13 @@ impl Node {
             let mut m = Some(Match {
                 handler,
                 params: PathParams {
-                    h: Some(HashMap::new()),
+                    params: Some(HashMap::new()),
                 },
             });
             m.as_mut()
                 .unwrap()
                 .params
-                .h
+                .params
                 .as_mut()
                 .unwrap()
                 .insert(enode.id.as_ref(), path.to_owned());

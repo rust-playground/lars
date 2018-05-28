@@ -138,11 +138,35 @@ impl RouteBuilder {
         self.add(Method::Head, path, handler)
     }
 
+    pub fn head_with_middleware<H, MW>(self, path: &str, handler: H, middleware: Vec<MW>) -> Self
+    where
+        H: Sized + node::Handler,
+        MW: Sized + Middleware + 'static,
+    {
+        let mut mw: Vec<Box<Middleware>> = Vec::new();
+        for m in middleware {
+            mw.push(Box::new(m));
+        }
+        self.add_with_middleware(Method::Head, path, handler, Some(mw))
+    }
+
     pub fn post<H>(self, path: &str, handler: H) -> Self
     where
         H: Sized + node::Handler,
     {
         self.add(Method::Post, path, handler)
+    }
+
+    pub fn post_with_middleware<H, MW>(self, path: &str, handler: H, middleware: Vec<MW>) -> Self
+    where
+        H: Sized + node::Handler,
+        MW: Sized + Middleware + 'static,
+    {
+        let mut mw: Vec<Box<Middleware>> = Vec::new();
+        for m in middleware {
+            mw.push(Box::new(m));
+        }
+        self.add_with_middleware(Method::Post, path, handler, Some(mw))
     }
 
     pub fn put<H>(self, path: &str, handler: H) -> Self
@@ -152,11 +176,35 @@ impl RouteBuilder {
         self.add(Method::Put, path, handler)
     }
 
+    pub fn put_with_middleware<H, MW>(self, path: &str, handler: H, middleware: Vec<MW>) -> Self
+    where
+        H: Sized + node::Handler,
+        MW: Sized + Middleware + 'static,
+    {
+        let mut mw: Vec<Box<Middleware>> = Vec::new();
+        for m in middleware {
+            mw.push(Box::new(m));
+        }
+        self.add_with_middleware(Method::Put, path, handler, Some(mw))
+    }
+
     pub fn delete<H>(self, path: &str, handler: H) -> Self
     where
         H: Sized + node::Handler,
     {
         self.add(Method::Delete, path, handler)
+    }
+
+    pub fn delete_with_middleware<H, MW>(self, path: &str, handler: H, middleware: Vec<MW>) -> Self
+    where
+        H: Sized + node::Handler,
+        MW: Sized + Middleware + 'static,
+    {
+        let mut mw: Vec<Box<Middleware>> = Vec::new();
+        for m in middleware {
+            mw.push(Box::new(m));
+        }
+        self.add_with_middleware(Method::Delete, path, handler, Some(mw))
     }
 
     pub fn connect<H>(self, path: &str, handler: H) -> Self
@@ -166,11 +214,35 @@ impl RouteBuilder {
         self.add(Method::Connect, path, handler)
     }
 
+    pub fn connect_with_middleware<H, MW>(self, path: &str, handler: H, middleware: Vec<MW>) -> Self
+    where
+        H: Sized + node::Handler,
+        MW: Sized + Middleware + 'static,
+    {
+        let mut mw: Vec<Box<Middleware>> = Vec::new();
+        for m in middleware {
+            mw.push(Box::new(m));
+        }
+        self.add_with_middleware(Method::Connect, path, handler, Some(mw))
+    }
+
     pub fn options<H>(self, path: &str, handler: H) -> Self
     where
         H: Sized + node::Handler,
     {
         self.add(Method::Options, path, handler)
+    }
+
+    pub fn options_with_middleware<H, MW>(self, path: &str, handler: H, middleware: Vec<MW>) -> Self
+    where
+        H: Sized + node::Handler,
+        MW: Sized + Middleware + 'static,
+    {
+        let mut mw: Vec<Box<Middleware>> = Vec::new();
+        for m in middleware {
+            mw.push(Box::new(m));
+        }
+        self.add_with_middleware(Method::Options, path, handler, Some(mw))
     }
 
     pub fn trace<H>(self, path: &str, handler: H) -> Self
@@ -180,11 +252,35 @@ impl RouteBuilder {
         self.add(Method::Trace, path, handler)
     }
 
-    pub fn path<H>(self, path: &str, handler: H) -> Self
+    pub fn trace_with_middleware<H, MW>(self, path: &str, handler: H, middleware: Vec<MW>) -> Self
+    where
+        H: Sized + node::Handler,
+        MW: Sized + Middleware + 'static,
+    {
+        let mut mw: Vec<Box<Middleware>> = Vec::new();
+        for m in middleware {
+            mw.push(Box::new(m));
+        }
+        self.add_with_middleware(Method::Trace, path, handler, Some(mw))
+    }
+
+    pub fn patch<H>(self, path: &str, handler: H) -> Self
     where
         H: Sized + node::Handler,
     {
         self.add(Method::Patch, path, handler)
+    }
+
+    pub fn patch_with_middleware<H, MW>(self, path: &str, handler: H, middleware: Vec<MW>) -> Self
+    where
+        H: Sized + node::Handler,
+        MW: Sized + Middleware + 'static,
+    {
+        let mut mw: Vec<Box<Middleware>> = Vec::new();
+        for m in middleware {
+            mw.push(Box::new(m));
+        }
+        self.add_with_middleware(Method::Patch, path, handler, Some(mw))
     }
 
     pub fn finalize(self) -> Router {
