@@ -1,8 +1,9 @@
 [package]
+authors = ["Dean Karn <dean.karn@gmail.com>"]
 name = "lars"
 version = "0.1.0"
-authors = ["Dean Karn <dean.karn@gmail.com>"]
 
 [dependencies]
 futures = "0.1.19"
 hyper = "0.11.27"
+tokio-core = "0.1.17"

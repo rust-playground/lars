@@ -301,8 +301,172 @@ fn not_found(_req: Request, _params: PathParams) -> Box<Future<Item = Response, 
 
 #[cfg(test)]
 mod tests {
+    extern crate tokio_core;
+
+    use super::*;
+    use futures::sync::oneshot::{self, Canceled, Sender};
+    use futures::{Future, Stream};
+    use hyper::header::UserAgent;
+    use hyper::server::Http;
+    use hyper::{Chunk, Client};
+    use std::io;
+    use std::str;
+    use std::thread;
+    use tests::tokio_core::reactor::Core;
+
+    struct MW {}
+
+    impl Middleware for MW {
+        fn next(&self, handler: Box<Handler>) -> Box<Handler> {
+            let func = move |req: Request, _params: PathParams| {
+                let x = Box::new(handler.handle(req, _params).then(|mut f| {
+                    f.as_mut().unwrap().set_status(hyper::BadRequest);
+                    f
+                }));
+                let x: Box<Future<Item = Response, Error = hyper::Error>> = x;
+                x
+            };
+            Box::new(func)
+        }
+    }
+
+    fn test(req: Request, _params: PathParams) -> Box<Future<Item = Response, Error = Error>> {
+        let body = format!("{}", req.uri());
+        Box::new(futures::future::ok(
+            Response::new()
+                .with_status(StatusCode::Ok)
+                .with_header(ContentLength(body.len() as u64))
+                .with_body(body),
+        ))
+    }
+
     #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    fn paths() {
+        let (tx, rx) = oneshot::channel::<bool>();
+        let finish = rx.and_then(|res| -> Result<(), Canceled> { Ok(()) })
+            .map_err(|_| ());
+
+        let h = thread::spawn(|| {
+            let router = RouteBuilder::new()
+                .get("/", test)
+                .get("/test", test)
+                .get("/test/:id/handler", test)
+                .get("/test/:id/handler/*wild", test)
+                .get_with_middleware("/with-middleware", test, vec![MW {}])
+                .finalize();
+            let addr = "127.0.0.1:3000".parse().unwrap();
+            let server = Http::new().bind(&addr, router).unwrap();
+            server.run_until(finish).unwrap();
+        });
+
+        let mut core = Core::new().unwrap();
+        let client = Client::new(&core.handle());
+
+        let work = client
+            .get("http://localhost:3000/".parse().unwrap())
+            .and_then(|res| {
+                assert_eq!(res.status(), hyper::Ok);
+
+                res.body().concat2().and_then(|body| {
+                    let s = str::from_utf8(&body).unwrap();
+                    assert_eq!("/", s);
+                    Ok(())
+                })
+            });
+        core.run(work).unwrap();
+
+        let work = client
+            .get("http://localhost:3000/test".parse().unwrap())
+            .and_then(|res| {
+                assert_eq!(res.status(), hyper::Ok);
+
+                res.body().concat2().and_then(|body| {
+                    let s = str::from_utf8(&body).unwrap();
+                    assert_eq!("/test", s);
+                    Ok(())
+                })
+            });
+        core.run(work).unwrap();
+
+        let work = client
+            .get("http://localhost:3000/test/13/handler".parse().unwrap())
+            .and_then(|res| {
+                assert_eq!(res.status(), hyper::Ok);
+
+                res.body().concat2().and_then(|body| {
+                    let s = str::from_utf8(&body).unwrap();
+                    assert_eq!("/test/13/handler", s);
+                    Ok(())
+                })
+            });
+        core.run(work).unwrap();
+
+        let work = client
+            .get("http://localhost:3000/test/".parse().unwrap())
+            .and_then(|res| {
+                assert_eq!(res.status(), hyper::NotFound);
+
+                res.body().concat2().and_then(|body| {
+                    let s = str::from_utf8(&body).unwrap();
+                    assert_eq!("Not Found", s);
+                    Ok(())
+                })
+            });
+        core.run(work).unwrap();
+
+        let work = client
+            .get(
+                "http://localhost:3000/test/13/handler/this/is/my/wildcard/path"
+                    .parse()
+                    .unwrap(),
+            )
+            .and_then(|res| {
+                assert_eq!(res.status(), hyper::Ok);
+
+                res.body().concat2().and_then(|body| {
+                    let s = str::from_utf8(&body).unwrap();
+                    assert_eq!("/test/13/handler/this/is/my/wildcard/path", s);
+                    Ok(())
+                })
+            });
+        core.run(work).unwrap();
+
+        let work = client
+            .get("http://localhost:3000/with-middleware".parse().unwrap())
+            .and_then(|res| {
+                assert_eq!(res.status(), hyper::BadRequest);
+
+                res.body().concat2().and_then(|body| {
+                    let s = str::from_utf8(&body).unwrap();
+                    assert_eq!("/with-middleware", s);
+                    Ok(())
+                })
+            });
+        core.run(work).unwrap();
+
+        drop(tx);
+        let _ = h.join();
+    }
+
+    #[test]
+    #[should_panic]
+    fn panic_differing_param_path() {
+        RouteBuilder::new()
+            .get("/test/:id/handler", test)
+            .get("/test/:user_id/handler/2", test);
+    }
+
+    #[test]
+    #[should_panic]
+    fn panic_wild_param_path() {
+        RouteBuilder::new().get("/test/*wild/handler/:id", test);
+    }
+
+    #[test]
+    #[should_panic]
+    fn panic_differing_wild_path() {
+        RouteBuilder::new()
+            .get("/test/*wild", test)
+            .get("/test/*wild2", test);
     }
 }
