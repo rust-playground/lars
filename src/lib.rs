@@ -24,6 +24,38 @@ pub struct RouteBuilder {
 }
 
 impl RouteBuilder {
+    /// Constructs a new `RouteBuilder`.
+    ///
+    /// The `RouteBuilder` is used to register the routes, middleware and set custom values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// extern crate futures;
+    /// extern crate hyper;
+    /// extern crate lars;
+    ///
+    /// use lars::{Handler, PathParams, RouteBuilder};
+    /// use hyper::{Error, Request, Response, StatusCode};
+    /// use futures::{Future, future};
+    /// use hyper::server::Http;
+    ///
+    /// let router = RouteBuilder::new()
+    ///     .get("/", root)
+    ///     .finalize();
+    ///
+    /// let addr = "127.0.0.1:3000".parse().unwrap();
+    /// let server = Http::new().bind(&addr, router).unwrap();
+    /// // server.run().unwrap();
+    ///
+    /// fn root(req: Request, params: PathParams) -> Box<Future<Item = Response, Error = Error>> {
+    ///    Box::new(future::ok(
+    ///        Response::new()
+    ///            .with_status(StatusCode::Ok)
+    ///            .with_body("root"),
+    ///    ))
+    /// }
+    /// ```
     pub fn new() -> Self {
         RouteBuilder {
             tree: Routes::new(),
