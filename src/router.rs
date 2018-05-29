@@ -10,7 +10,7 @@ use hyper::header::{Allow, ContentLength};
 use hyper::server::{NewService, Request, Response, Service};
 use hyper::{Method, StatusCode};
 
-use node::{Handler, Node, PathParams};
+use node::{Handler, Node, RequestData};
 
 pub type Routes = HashMap<Method, Node>;
 
@@ -102,5 +102,7 @@ fn handle_method_not_allowed_not_found(
                 .with_body(METHOD_NOT_ALLOWED),
         ));
     }
-    rs.config.not_found.handle(req, PathParams { params: None })
+    rs.config
+        .not_found
+        .handle(req, RequestData { params: None })
 }

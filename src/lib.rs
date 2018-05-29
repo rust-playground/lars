@@ -15,7 +15,7 @@ use node::Node;
 use router::{Router, Routes};
 
 pub use middleware::Middleware;
-pub use node::{Handler, PathParams};
+pub use node::{Handler, RequestData};
 
 pub struct RouteBuilder {
     tree: Routes,
@@ -35,7 +35,7 @@ impl RouteBuilder {
     /// extern crate hyper;
     /// extern crate lars;
     ///
-    /// use lars::{Handler, PathParams, RouteBuilder};
+    /// use lars::{Handler, RequestData, RouteBuilder};
     /// use hyper::{Error, Request, Response, StatusCode};
     /// use futures::{Future, future};
     /// use hyper::server::Http;
@@ -48,7 +48,7 @@ impl RouteBuilder {
     /// let server = Http::new().bind(&addr, router).unwrap();
     /// // server.run().unwrap();
     ///
-    /// fn root(req: Request, params: PathParams) -> Box<Future<Item = Response, Error = Error>> {
+    /// fn root(req: Request, data: RequestData) -> Box<Future<Item = Response, Error = Error>> {
     ///    Box::new(future::ok(
     ///        Response::new()
     ///            .with_status(StatusCode::Ok)
@@ -56,6 +56,13 @@ impl RouteBuilder {
     ///    ))
     /// }
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// - If two similar routes are configured with differing parameter names eg. `/user/:foo` and `/user/:bar/profile`
+    /// - If registering a duplicate wildcard route with differing wildcard names eg. `/user/*foo` and `/user/*bar`
+    /// - If a parameter or wildcard is configured after a wildcard eg. `/user/*/:foo`
+    ///
     pub fn new() -> Self {
         RouteBuilder {
             tree: Routes::new(),
@@ -322,7 +329,7 @@ impl RouteBuilder {
 
 const NOT_FOUND: &'static str = "Not Found";
 
-fn not_found(_req: Request, _params: PathParams) -> Box<Future<Item = Response, Error = Error>> {
+fn not_found(_req: Request, _params: RequestData) -> Box<Future<Item = Response, Error = Error>> {
     Box::new(futures::future::ok(
         Response::new()
             .with_status(StatusCode::NotFound)
@@ -350,7 +357,7 @@ mod tests {
 
     impl Middleware for MW {
         fn next(&self, handler: Box<Handler>) -> Box<Handler> {
-            let func = move |req: Request, _params: PathParams| {
+            let func = move |req: Request, _params: RequestData| {
                 let x = Box::new(handler.handle(req, _params).then(|mut f| {
                     f.as_mut().unwrap().set_status(hyper::BadRequest);
                     f
@@ -362,7 +369,7 @@ mod tests {
         }
     }
 
-    fn test(req: Request, _params: PathParams) -> Box<Future<Item = Response, Error = Error>> {
+    fn test(req: Request, _params: RequestData) -> Box<Future<Item = Response, Error = Error>> {
         let body = format!("{}", req.uri());
         Box::new(futures::future::ok(
             Response::new()

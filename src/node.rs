@@ -8,11 +8,12 @@ use hyper::{Request, Response};
 use std::collections::HashMap;
 use std::fmt;
 
+/// Handler is the trait that routes must comply with.
 pub trait Handler: 'static + Send + Sync {
     fn handle(
         &self,
         req: Request,
-        params: PathParams,
+        params: RequestData,
     ) -> Box<Future<Item = Response, Error = Error>>;
 }
 
@@ -22,17 +23,18 @@ impl fmt::Debug for Handler {
     }
 }
 
+/// Handler impl allows for statis functions to be ussed as `Handler` trait.
 impl<F> Handler for F
 where
     F: 'static
         + Send
         + Sync
-        + Fn(Request, PathParams) -> Box<Future<Item = Response, Error = Error>>,
+        + Fn(Request, RequestData) -> Box<Future<Item = Response, Error = Error>>,
 {
     fn handle(
         &self,
         req: Request,
-        params: PathParams,
+        params: RequestData,
     ) -> Box<Future<Item = Response, Error = Error>> {
         (*self)(req, params)
     }
@@ -40,11 +42,42 @@ where
 
 pub struct Match<'a> {
     pub handler: &'a Box<Handler>,
-    pub params: PathParams<'a>,
+    pub params: RequestData<'a>,
 }
 
+/// RequestData contains request scoped information.
+///
+/// The RequestData is passed down to your handler for consumption.
+///
+/// # Examples
+///
+/// ```
+/// extern crate futures;
+/// extern crate hyper;
+/// extern crate lars;
+///
+/// use lars::{RequestData};
+/// use hyper::{Error, Request, Response, StatusCode};
+/// use futures::{Future, future};
+///
+/// fn root(req: Request, data: RequestData) -> Box<Future<Item = Response, Error = Error>> {
+///    let mut id:String = String::from("");
+///    if data.params.is_some() {
+///        id = data.params.unwrap().get(":id").unwrap().to_owned();
+///    }
+///    if id == "" {
+///      // ...
+///    }
+///    Box::new(future::ok(
+///        Response::new()
+///            .with_status(StatusCode::Ok)
+///            .with_body("root"),
+///    ))
+/// }
+/// ```
+///
 #[derive(Debug)]
-pub struct PathParams<'p> {
+pub struct RequestData<'p> {
     pub params: Option<HashMap<&'p str, String>>,
 }
 
@@ -153,7 +186,7 @@ impl Node {
                         let handler = &node.handler.as_ref()?;
                         return Some(Match {
                             handler,
-                            params: PathParams { params: None },
+                            params: RequestData { params: None },
                         });
                     }
                     return node.find(parts[1]);
@@ -174,7 +207,7 @@ impl Node {
                 let handler = node.handler.as_ref()?;
                 let mut m = Some(Match {
                     handler,
-                    params: PathParams {
+                    params: RequestData {
                         params: Some(HashMap::new()),
                     },
                 });
@@ -207,7 +240,7 @@ impl Node {
 
             let mut m = Some(Match {
                 handler,
-                params: PathParams {
+                params: RequestData {
                     params: Some(HashMap::new()),
                 },
             });
