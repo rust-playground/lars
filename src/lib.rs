@@ -14,6 +14,8 @@ use futures::Future;
 use node::Node;
 use router::{Router, Routes};
 
+use std::collections::HashMap;
+
 pub use middleware::Middleware;
 pub use node::{Handler, RequestData};
 
@@ -120,6 +122,19 @@ impl RouteBuilder {
 
         if left != "/" {
             panic!("paths must start with '/'");
+        }
+
+        let mut params: HashMap<&str, bool> = HashMap::new();
+        for p in path.split("/").collect::<Vec<&str>>() {
+            if p.chars().nth(0) == Some(':') {
+                if params.get(p).is_some() {
+                    panic!(
+                        "conflicting parameter names detected for path {}, for paramter {}",
+                        path, p
+                    )
+                }
+                params.insert(p, true);
+            }
         }
 
         let mut h: Box<node::Handler> = Box::new(handler);
@@ -343,12 +358,11 @@ mod tests {
     extern crate tokio_core;
 
     use super::*;
-    use futures::sync::oneshot::{self, Canceled, Sender};
+
+    use futures::sync::oneshot::{self, Canceled};
     use futures::{Future, Stream};
-    use hyper::header::UserAgent;
+    use hyper::Client;
     use hyper::server::Http;
-    use hyper::{Chunk, Client};
-    use std::io;
     use std::str;
     use std::thread;
     use tests::tokio_core::reactor::Core;
@@ -382,7 +396,7 @@ mod tests {
     #[test]
     fn paths() {
         let (tx, rx) = oneshot::channel::<bool>();
-        let finish = rx.and_then(|res| -> Result<(), Canceled> { Ok(()) })
+        let finish = rx.and_then(|_res| -> Result<(), Canceled> { Ok(()) })
             .map_err(|_| ());
 
         let h = thread::spawn(|| {
@@ -507,5 +521,17 @@ mod tests {
         RouteBuilder::new()
             .get("/test/*wild", test)
             .get("/test/*wild2", test);
+    }
+
+    #[test]
+    #[should_panic]
+    fn panic_duplicate_param_names_path() {
+        RouteBuilder::new().get("/test/:id/handler/:id", test);
+    }
+
+    #[test]
+    #[should_panic]
+    fn panic_duplicate_wild_names_path() {
+        RouteBuilder::new().get("/test/*id/handler/*id", test);
     }
 }
