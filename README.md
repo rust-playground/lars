@@ -12,7 +12,7 @@ Usage
 First, add this to your `Cargo.toml`:
 ```toml
 [dependencies]
-lars = "0.0.1"
+lars = "0.1.0"
 ```
 
 Here is a quite example to get you going:
