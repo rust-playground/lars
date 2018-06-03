@@ -5,7 +5,7 @@ mod middleware;
 mod node;
 mod router;
 
-use hyper::header::ContentLength;
+use hyper::header::{Allow, ContentLength};
 use hyper::server::{Request, Response};
 use hyper::{Error, Method, StatusCode};
 
@@ -142,14 +142,6 @@ impl RouteBuilder {
         // middleware just for this handler
         if middleware.is_some() {
             let mw = middleware.as_ref().unwrap();
-            for i in (0..mw.len()).rev() {
-                h = mw[i].next(h);
-            }
-        }
-
-        // global middleware
-        if self.middleware.is_some() {
-            let mw = self.middleware.as_ref().unwrap();
             for i in (0..mw.len()).rev() {
                 h = mw[i].next(h);
             }
@@ -338,8 +330,83 @@ impl RouteBuilder {
     }
 
     pub fn finalize(self) -> Router {
-        Router::new(self.tree, self.not_found)
+        let find = Find::new(self.tree, self.not_found);
+        let mut h: Box<node::Handler> = Box::new(find);
+
+        // global middleware
+        if self.middleware.is_some() {
+            let mw = self.middleware.as_ref().unwrap();
+            for i in (0..mw.len()).rev() {
+                h = mw[i].next(h);
+            }
+        }
+        Router::new(h)
     }
+}
+
+struct Find {
+    tree: Routes,
+    not_found: Box<node::Handler>,
+}
+
+impl Find {
+    pub fn new(tree: Routes, not_found: Box<Handler>) -> Self {
+        Find { tree, not_found }
+    }
+}
+
+impl Handler for Find {
+    fn handle(
+        &self,
+        req: Request,
+        _params: RequestData,
+    ) -> Box<Future<Item = Response, Error = Error>> {
+        let p = req.path().to_owned();
+        let (_, right) = p.split_at(1);
+
+        let node = self.tree.get(req.method());
+        if node.is_none() {
+            return handle_method_not_allowed_not_found(&self.tree, &self.not_found, req, right);
+        }
+        let m = node.unwrap().find(right);
+        if m.is_none() {
+            return handle_method_not_allowed_not_found(&self.tree, &self.not_found, req, right);
+        }
+        let m = m.unwrap();
+        m.handler.handle(req, m.params)
+    }
+}
+
+fn handle_method_not_allowed_not_found(
+    tree: &Routes,
+    not_found: &Box<node::Handler>,
+    req: Request,
+    path: &str,
+) -> Box<Future<Item = Response, Error = hyper::Error>> {
+    const METHOD_NOT_ALLOWED: &'static str = "Method Not Allowed";
+    let mut found = false;
+    let mut methods: Vec<Method> = Vec::new();
+
+    for (k, v) in tree {
+        if k == req.method() {
+            continue;
+        }
+        let m = v.find(path);
+        if m.is_some() {
+            methods.push(k.clone());
+            found = true;
+        }
+    }
+    if found {
+        return Box::new(futures::future::ok(
+            Response::new()
+                .with_status(StatusCode::MethodNotAllowed)
+                .with_header(ContentLength(METHOD_NOT_ALLOWED.len() as u64))
+                .with_header(Allow(methods))
+                .with_body(METHOD_NOT_ALLOWED),
+        ));
+    }
+    not_found.handle(req, RequestData { params: None })
 }
 
 const NOT_FOUND: &'static str = "Not Found";
