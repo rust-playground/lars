@@ -359,18 +359,30 @@ impl Handler for Find {
     fn handle(
         &self,
         req: Request,
-        _params: RequestData,
+        params: RequestData,
     ) -> Box<Future<Item = Response, Error = Error>> {
         let p = req.path().to_owned();
         let (_, right) = p.split_at(1);
 
         let node = self.tree.get(req.method());
         if node.is_none() {
-            return handle_method_not_allowed_not_found(&self.tree, &self.not_found, req, right);
+            return handle_method_not_allowed_not_found(
+                &self.tree,
+                &self.not_found,
+                req,
+                params,
+                right,
+            );
         }
         let m = node.unwrap().find(right);
         if m.is_none() {
-            return handle_method_not_allowed_not_found(&self.tree, &self.not_found, req, right);
+            return handle_method_not_allowed_not_found(
+                &self.tree,
+                &self.not_found,
+                req,
+                params,
+                right,
+            );
         }
         let m = m.unwrap();
         m.handler.handle(req, m.params)
@@ -381,6 +393,7 @@ fn handle_method_not_allowed_not_found(
     tree: &Routes,
     not_found: &Box<node::Handler>,
     req: Request,
+    params: RequestData,
     path: &str,
 ) -> Box<Future<Item = Response, Error = hyper::Error>> {
     const METHOD_NOT_ALLOWED: &'static str = "Method Not Allowed";
@@ -406,7 +419,7 @@ fn handle_method_not_allowed_not_found(
                 .with_body(METHOD_NOT_ALLOWED),
         ));
     }
-    not_found.handle(req, RequestData { params: None })
+    not_found.handle(req, params)
 }
 
 const NOT_FOUND: &'static str = "Not Found";
